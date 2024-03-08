@@ -1,5 +1,7 @@
 # GVE DevNet Catalyst AP Port Speed Report
-This repository contains the source code of a Python script that can create a report regarding the AP ethernet statistics of a Catalyst WLC. The script connects to the WLC with the Netmiko library, executes the show command 'show ap ethernet statistics', parses the output, and then writes the results to an Excel spreadsheet.
+This repository contains the source code of two Python scripts that can create a report regarding the AP ethernet statistics of Catalyst WLCs. One script connects to the WLCs with the Netmiko library, executes the show command 'show ap ethernet statistics', parses the output, and then writes the results to an Excel spreadsheet. The other script uses the DNA Center APIs to retrieve a list of WLCs, runs the 'show ap ethernet statistics' command, parses the output, and then writes the results to an Excel spreadsheet.
+
+![/IMAGES/workflow.png](/IMAGES/workflow.png)
 
 ## Contacts
 * Danielle Stacy
@@ -7,17 +9,31 @@ This repository contains the source code of a Python script that can create a re
 ## Solution Components
 * Python 3.11
 * Netmiko
+* DNA Center
 * Catalyst WLC
 * Catalyst AP
 * Excel
 
 ## Prerequisites
-Configure the environmental variables in the .env file with the appropriate credentials for your network
+If you are using the DNA Center script, configure the environmental variables in the .env file with the appropriate credentials for your instance of DNA Center.
 ```python
-IP_ADDRESS = "provide IP address here"
-USERNAME = "provide ssh username here"
-PASSWORD = "provide ssh password here"
+DNAC_IP = "provide DNAC IP address here"
+USERNAME = "provide DNAC username here"
+PASSWORD = "provide DNAC password here"
 ```
+
+If you are not using the DNA Center script, configure the credentials.json file with the appropriate credentials for your WLCs
+```
+[
+	{
+		"IP_ADDRESS": "provide WLC IP address here",
+		"USERNAME": "provide SSH username here",
+		"PASSWORD": "provide SSH password here"
+	}
+]
+```
+
+If you want to add multiple WLCs, copy the structure between the curly braces ({}), including the braces, and paste it under the current structure, separated by a comma and within the square brackets ([]).
 
 ## Installation/Configuration
 1. Clone this repository with the comman: `git clone https://github.com/gve-sw/gve_devnet_catalyst_ap_port_speed_report.git`.
@@ -25,17 +41,29 @@ PASSWORD = "provide ssh password here"
 3. Install the requirements with `pip3 install -r requirements.txt`.
 
 ## Usage
-To run the script, enter the following command:
+To run the script using the DNA Center APIs, enter the following command:
 ```
-python report.py
+python report_dnac.py
 ```
+
+As the script runs, it will produce the following output:
+![/IMAGES/dnac_output.png](/IMAGES/dnac_output.png)
+
+To run the script using Netmiko, enter the following command:
+```
+python report_ssh.py
+```
+
+As the script runs, it will produce the following output:
+![/IMAGES/netmiko_output.png](/IMAGES/netmiko_output.png)
+
 Once the code is complete, it will have created a spreadsheet entitled ap_ethernet_statistics.xlsx in the same directory as the code. This will contain the information parsed from the show command.
 
-# Screenshots
+![/IMAGES/catalyst_ap_speed_report.png](/IMAGES/catalyst_ap_speed_report.png)
+
 
 ![/IMAGES/0image.png](/IMAGES/0image.png)
 
-![/IMAGES/catalyst_ap_speed_report.png](/IMAGES/catalyst_ap_speed_report.png)
 
 ### LICENSE
 

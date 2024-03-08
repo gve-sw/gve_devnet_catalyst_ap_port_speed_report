@@ -20,6 +20,10 @@ import pandas as pd
 from dotenv import load_dotenv
 import os
 import sys
+import json
+from rich.console import Console
+from rich.panel import Panel
+from rich.progress import Progress
 from pprint import pprint
 
 
@@ -35,16 +39,21 @@ def connect_to_wlc(ip, user, password):
         "host": ip,
         "username": user,
         "password": password
-    }
+        }
 
     with ConnectHandler(**wlc) as wlc_connect:
-        ap_ethernet_stats = wlc_connect.send_command("show ap ethernet statistics")
+        hostname = wlc_connect.find_prompt()[:-1]
+        try:
+            ap_ethernet_stats = wlc_connect.send_command("show ap ethernet statistics")
+        except Exception as e:
+            print(e)
+
+            return None, hostname
+
+    return ap_ethernet_stats, hostname
 
 
-    return ap_ethernet_stats
-
-
-def parse_ap_ethernet_stats(output):
+def parse_ap_ethernet_stats(output, hostname):
     """
     Iterate through the show ap ethernet statistics output, remove the empty
     lines, separate the ethernet statistics by ap, and then add the statistics
@@ -77,6 +86,7 @@ def parse_ap_ethernet_stats(output):
     parsed_stats = []
     for ap_stats in lines_split_by_ap:
         stat_by_ap = {}
+        stat_by_ap["WLC"] = hostname
         ap_name_split = ap_stats[0].split(":")
         ap_name = ap_name_split[1].strip()
         stat_by_ap["AP"] = ap_name
@@ -99,14 +109,38 @@ def parse_ap_ethernet_stats(output):
 
 
 def main(argv):
-    # retrieve the environmental variables
-    load_dotenv()
-    IP = os.getenv("IP_ADDRESS")
-    USER = os.getenv("USERNAME")
-    PASSWORD = os.getenv("PASSWORD")
+    # retrieve the credentials
+    with open("credentials.json", "r") as credential_file:
+        CREDENTIALS = json.loads(credential_file.read())
 
-    ethernet_stats = connect_to_wlc(IP, USER, PASSWORD)
-    parsed_stats = parse_ap_ethernet_stats(ethernet_stats)
+    console = Console()
+    console.print(Panel.fit(f"AP Port Speed Report"))
+
+    parsed_stats = []
+    with Progress() as progress:
+        overall_progress = progress.add_task("Overall Progress",
+                                             total=len(CREDENTIALS),
+                                             transient=True)
+        for wlc in CREDENTIALS:
+            IP = wlc["IP_ADDRESS"]
+            USER = wlc["USERNAME"]
+            PASSWORD = wlc["PASSWORD"]
+
+            progress.console.print(f"Retrieving and parsing AP Ethernet stats of WLC with IP {IP}")
+
+            # connect to the WLCs and run command
+            ethernet_stats, wlc = connect_to_wlc(IP, USER, PASSWORD)
+            # check to make sure the command was successfully run
+            if ethernet_stats is None:
+                # if not, move to next WLC in the list
+                console.print(f"[red]Error[/]: failed to run show ap ethernet statistics on WLC with IP {IP}, see above message for why")
+                progress.update(overall_progress, advance=1)
+                continue
+
+            # parse the output of the command
+            parsed_stats.extend(parse_ap_ethernet_stats(ethernet_stats, wlc))
+
+            progress.update(overall_progress, advance=1)
 
     with pd.ExcelWriter("ap_ethernet_statistics.xlsx") as writer:
         stats_df = pd.DataFrame.from_dict(parsed_stats)
